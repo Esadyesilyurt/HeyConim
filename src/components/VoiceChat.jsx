@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import io from 'socket.io-client'
 import './VoiceChat.css'
 
-const SOCKET_URL = 'heyconim-production.up.railway.app'
+const SOCKET_URL = 'https://heyconim-production.up.railway.app'
   ? 'https://your-backend-url.herokuapp.com' 
   : 'http://localhost:3001'
 

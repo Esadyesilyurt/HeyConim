@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import io from 'socket.io-client'
 import './VoiceChat.css'
 
-const SOCKET_URL = 'https://heyconim-production.up.railway.app'
-  ? 'https://your-backend-url.herokuapp.com' 
+const SOCKET_URL = process.env.NODE_ENV === 'production' 
+  ? 'heyconim-production.up.railway.app' 
   : 'http://localhost:3001'
 
 function VoiceChat({ username, onLogout }) {

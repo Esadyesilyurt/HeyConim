@@ -9,7 +9,7 @@ const server = http.createServer(app)
 const io = new Server(server, {
   cors: {
     origin: process.env.NODE_ENV === 'production' 
-      ? 'https://your-username.github.io' 
+      ? 'https://esadyesilyurt.github.io' 
       : 'http://localhost:3000',
     methods: ['GET', 'POST'],
     credentials: true

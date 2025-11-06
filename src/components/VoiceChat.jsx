@@ -41,9 +41,19 @@ function VoiceChat({ username, onLogout }) {
       createPeerConnection(userId, true)
     })
 
-    socketRef.current.on('user-left', ({ userId }) => {
+        socketRef.current.on('user-left', ({ userId }) => {
       setUsers(prev => prev.filter(u => u.id !== userId))
       if (peerConnectionsRef.current[userId]) {
+        const peerConnection = peerConnectionsRef.current[userId]
+        // Audio elementini temizle
+        if (peerConnection.audioElement) {
+          peerConnection.audioElement.pause()
+          peerConnection.audioElement.srcObject = null
+        }
+        peerConnection.close()
+        delete peerConnectionsRef.current[userId]
+      }
+    })
         peerConnectionsRef.current[userId].close()
         delete peerConnectionsRef.current[userId]
       }
@@ -117,54 +127,54 @@ function VoiceChat({ username, onLogout }) {
       })
     }
 
-    // Uzak stream'i al
+        // Uzak stream'i al
     peerConnection.ontrack = (event) => {
       const [remoteStream] = event.streams
-      const audio = new Audio()
-      audio.srcObject = remoteStream
-      audio.autoplay = true
-      audio.volume = isDeafened ? 0 : 1
-      audio.play().catch(e => console.error('Ses çalma hatası:', e))
-    }
-
-    // ICE candidate'ları gönder
-    peerConnection.onicecandidate = (event) => {
-      if (event.candidate) {
-        socketRef.current.emit('ice-candidate', {
-          candidate: event.candidate,
-          to: userId
+      console.log('Uzak stream alındı:', userId, remoteStream)
+      
+      // Her kullanıcı için bir audio elementi oluştur ve sakla
+      if (!peerConnection.audioElement) {
+        const audio = new Audio()
+        audio.srcObject = remoteStream
+        audio.autoplay = true
+        audio.volume = isDeafened ? 0 : 1
+        peerConnection.audioElement = audio
+        
+        audio.play().catch(e => {
+          console.error('Ses çalma hatası:', e)
+          // Kullanıcı etkileşimi gerekiyor olabilir
+          audio.play().catch(err => console.error('Tekrar deneme hatası:', err))
         })
+      } else {
+        // Mevcut audio elementini güncelle
+        peerConnection.audioElement.srcObject = remoteStream
+        peerConnection.audioElement.volume = isDeafened ? 0 : 1
       }
     }
-
-    if (isInitiator) {
-      try {
-        const offer = await peerConnection.createOffer()
-        await peerConnection.setLocalDescription(offer)
-        socketRef.current.emit('offer', {
-          offer,
-          to: userId
-        })
-      } catch (error) {
-        console.error('Offer oluşturma hatası:', error)
+    
+    // Connection state değişikliklerini izle
+    peerConnection.onconnectionstatechange = () => {
+      console.log(`Peer connection state (${userId}):`, peerConnection.connectionState)
+      if (peerConnection.connectionState === 'failed') {
+        console.error('Peer connection başarısız:', userId)
       }
     }
-  }
-
-  const handleOffer = async (offer, from) => {
-    await createPeerConnection(from, false)
+    
+    peerConnection.oniceconnectionstatechange = () => {
+      console.log(`ICE connection state (${userId}):`, peerConnection.iceConnectionState)
+    }
     const peerConnection = peerConnectionsRef.current[from]
     await peerConnection.setRemoteDescription(new RTCSessionDescription(offer))
-    
-    const answer = await peerConnection.createAnswer()
-    await peerConnection.setLocalDescription(answer)
-    
-    socketRef.current.emit('answer', {
-      answer,
-      to: from
-    })
+      const handleAnswer = async (answer, from) => {
+    const peerConnection = peerConnectionsRef.current[from]
+    if (peerConnection) {
+      try {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(answer))
+      } catch (error) {
+        console.error('Answer setRemoteDescription hatası:', error)
+      }
+    }
   }
-
   const handleAnswer = async (answer, from) => {
     const peerConnection = peerConnectionsRef.current[from]
     if (peerConnection) {
@@ -216,16 +226,16 @@ function VoiceChat({ username, onLogout }) {
         </div>
       </div>
 
-      <div className="voice-chat-content">
-        <div className="sidebar">
-          <div className="room-section">
-            <h3>Oda</h3>
-            <div className="room-input-group">
-              <input
-                type="text"
-                placeholder="Oda ID girin"
-                value={roomId}
-                onChange={(e) => setRoomId(e.target.value)}
+        const toggleDeafen = () => {
+    const newDeafenedState = !isDeafened
+    setIsDeafened(newDeafenedState)
+    // Tüm peer connection'lardaki audio elementlerinin sesini ayarla
+    Object.values(peerConnectionsRef.current).forEach(peerConnection => {
+      if (peerConnection.audioElement) {
+        peerConnection.audioElement.volume = newDeafenedState ? 0 : 1
+      }
+    })
+  }
                 className="room-input"
               />
               <button onClick={handleJoinRoom} className="join-btn">Katıl</button>
